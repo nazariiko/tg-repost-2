@@ -108,6 +108,7 @@ const parseChannels = async (dbClient) => {
       console.log(msg);
       switch (msg) {
         case 'This peer is not present in the internal peer database':
+        case 'CHANNEL_PRIVATE':
           await db
             .collection('connections')
             .updateMany({}, { $pull: { subscribedChannels: { $in: [channel] } } });
