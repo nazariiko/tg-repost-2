@@ -41,6 +41,7 @@ const parseChannels = async (dbClient) => {
       const posts = json.rss.channel.item.map((post) => {
         const link = post.link;
         let description = post.description;
+        description = description.replaceAll(/<a\b[^>]*>(.*?)<\/a>/g, '');
 
         const media = [];
 

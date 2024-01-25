@@ -10,6 +10,7 @@ const botConstants = {
     deletePost: 'delete_post',
     deleteMediaItem: 'delete_media_item',
     editPost: 'edit_post',
+    postImmediately: 'post_immediately_post',
     back: 'Назад',
     editText: 'Редактировать текст',
     publishPost: 'Опубликовать',

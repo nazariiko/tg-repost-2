@@ -147,7 +147,7 @@ class Bot {
 
           const msg2 = await this.tgBot.sendMessage(
             this.chatId,
-            `<a href="${post.channelLink}">@${post.channelNickname}</a>\n\n${description}`,
+            `${description}`,
             {
               parse_mode: 'HTML',
               reply_markup: {
@@ -155,6 +155,7 @@ class Bot {
                   [
                     { text: 'Редактировать ✏️', callback_data: `edit_post::${post.link}` },
                     { text: 'Удалить ❌', callback_data: `delete_post::${post.link}` },
+                    { text: 'Запостить 📩', callback_data: `post_immediately_post::${post.link}` },
                   ],
                 ],
               },
@@ -173,7 +174,7 @@ class Bot {
 
           const msg3 = await this.tgBot.sendMessage(
             this.chatId,
-            `<a href="${post.channelLink}">@${post.channelNickname}</a>\n\n${description}`,
+            `${description}`,
             {
               parse_mode: 'HTML',
               reply_markup: {
@@ -181,6 +182,7 @@ class Bot {
                   [
                     { text: 'Редактировать ✏️', callback_data: `edit_post::${post.link}` },
                     { text: 'Удалить ❌', callback_data: `delete_post::${post.link}` },
+                    { text: 'Запостить 📩', callback_data: `post_immediately_post::${post.link}` },
                   ],
                 ],
               },
@@ -487,6 +489,10 @@ class Bot {
 
         case botConstants.commands.editPost:
           this.goToEditingScreen(data);
+          break;
+
+        case botConstants.commands.postImmediately:
+          this.immediatelyPost(data)
           break;
 
         case botConstants.commands.chosePublishChannel:
@@ -873,7 +879,7 @@ class Bot {
             description = 'Выберите действие:';
           }
 
-          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, description, {
+          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, `${description}\n\n@${this.currentPublishChannel}`, {
             parse_mode: 'HTML',
           });
         } else {
@@ -886,7 +892,7 @@ class Bot {
           description = description.replace(/<a\s*[^>]*><\/a>/g, '');
           description = description.trim();
 
-          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, description, {
+          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, `${description}\n\n@${this.currentPublishChannel}`, {
             parse_mode: 'HTML',
           });
         }
@@ -922,6 +928,18 @@ class Bot {
     let msg = await this.commandsHandler.sendEditPostMsg();
     this.afterEditHistory.push(msg);
     await this.sendPostWithoutButtons(data, 'editPostMarkup');
+  }
+
+  async immediatelyPost(data) {
+    const myChanels = await this.getMyChannels();
+    if (myChanels.length > 1) {
+      this.currentEditingPostLink = data;
+      this.goToPublishScreen()
+    } else if (myChanels.length == 1) {
+      this.currentEditingPostLink = data;
+      this.currentPublishChannel = myChanels[0];
+      await this.handlePublishNow()
+    }
   }
 
   async goToStartScreen() {
