@@ -95,8 +95,20 @@ class Bot {
     const postsToSend = posts.filter((post) => !post.sended && !post.deleted);
 
     // console.log(postsToSend, 'postsToSend');
+    const absoluteChannels = await this.getAbsoluteChannels();
+    const myChanels = await this.getMyChannels();
 
     for (const post of postsToSend) {
+      if (myChanels.length === 1 && absoluteChannels.includes(post.channelNickname)) {
+        this.currentEditingPostLink = post.link;
+        this.currentPublishChannel = myChanels[0];
+        await this.publishPostInMyChannel()
+        this.currentEditingPostLink = null;
+        this.currentEditingPostLink = null;
+        await this.setPostIsSended(post);
+        continue;
+      }
+
       await this.sendPost(post);
       if (!this.state.active || this.state.isSenderBlocked) {
         setTimeout(() => {
@@ -229,6 +241,16 @@ class Bot {
             }
             break;
 
+          case botConstants.messages.updateAbsoluteChannels:
+            const absoluteChannels = text.split('\n');
+            status = await this.handleSaveAbsoluteChannels(absoluteChannels);
+            if (status.ok) {
+              this.commandsHandler.sendSuccessfullyUpdatedSubscribedChannels();
+            } else {
+              this.commandsHandler.sendErrorUpdatedSubscribedChannels(status.error);
+            }
+            break;
+
           case botConstants.messages.delayMessage:
             const hours = +text.split(':')[0];
             const minutes = +text.split(':')[1];
@@ -323,6 +345,11 @@ class Bot {
           this.commandsHandler.sendSubscribedChannels();
           break;
 
+        case botConstants.commands.updateAbsoluteChannels:
+          if (this.state.page !== 'startPage') return;
+          this.commandsHandler.sendUpdateAbsoluteChannels();
+          break;
+
         case botConstants.commands.updateMyChannels:
           if (this.state.page !== 'startPage') return;
           this.commandsHandler.sendUpdateMyChannels();
@@ -331,6 +358,11 @@ class Bot {
         case botConstants.commands.showMyChannels:
           if (this.state.page !== 'startPage') return;
           this.commandsHandler.sendMyChannels();
+          break;
+
+        case botConstants.commands.showAbsoluteChannels:
+          if (this.state.page !== 'startPage') return;
+          this.commandsHandler.sendAbsoluteChannels();
           break;
 
         case botConstants.commands.startWatcher:
@@ -1039,6 +1071,14 @@ class Bot {
     return channels;
   }
 
+  async getAbsoluteChannels() {
+    const currentConnection = await this.db
+      .collection('connections')
+      .findOne({ chatId: this.chatId });
+    const channels = currentConnection.absoluteChannels || [];
+    return channels;
+  }
+
   sendPostWithoutButtons(link, markup) {
     return new Promise(async (resolve, reject) => {
       const currentConnection = await this.db
@@ -1193,6 +1233,19 @@ class Bot {
     });
   }
 
+  handleSaveAbsoluteChannels(channels) {
+    return new Promise(async (resolve) => {
+      try {
+        await this.db
+          .collection('connections')
+          .findOneAndUpdate({ chatId: this.chatId }, { $set: { absoluteChannels: channels } });
+        resolve({ ok: true });
+      } catch (error) {
+        resolve({ ok: false, error: error });
+      }
+    });
+  }
+
   handleSaveMyChannels(channels) {
     return new Promise(async (resolve) => {
       try {
@@ -1282,6 +1335,13 @@ class CommandsHandler {
 
   async sendUpdateMyChannels() {
     await this.tgBot.sendMessage(this.chatId, botConstants.messages.updateMyChannels, {
+      parse_mode: 'HTML',
+      reply_markup: JSON.stringify({ force_reply: true }),
+    });
+  }
+
+  async sendUpdateAbsoluteChannels() {
+    await this.tgBot.sendMessage(this.chatId, botConstants.messages.updateAbsoluteChannels, {
       parse_mode: 'HTML',
       reply_markup: JSON.stringify({ force_reply: true }),
     });
@@ -1383,12 +1443,35 @@ class CommandsHandler {
     );
   }
 
+  async sendAbsoluteChannels() {
+    const currentCcnnection = await this.db
+      .collection('connections')
+      .findOne({ chatId: this.chatId });
+    const channels = currentCcnnection.absoluteChannels || [];
+    await this.tgBot.sendMessage(
+      this.chatId,
+      `Список безусловных каналов:\n${channels.join('\n')} `,
+      { parse_mode: 'HTML', reply_markup: botConstants.markups.startMarkup },
+    );
+  }
+
   async sendMyChannels() {
     const currentCcnnection = await this.db
       .collection('connections')
       .findOne({ chatId: this.chatId });
     const channels = currentCcnnection.myChannels || [];
     await this.tgBot.sendMessage(this.chatId, `Список моих каналов:\n${channels.join('\n')} `, {
+      parse_mode: 'HTML',
+      reply_markup: botConstants.markups.startMarkup,
+    });
+  }
+
+  async sendAbsoluteChannels() {
+    const currentCcnnection = await this.db
+      .collection('connections')
+      .findOne({ chatId: this.chatId });
+    const channels = currentCcnnection.absoluteChannels || [];
+    await this.tgBot.sendMessage(this.chatId, `Список безусловных каналов:\n${channels.join('\n')} `, {
       parse_mode: 'HTML',
       reply_markup: botConstants.markups.startMarkup,
     });
