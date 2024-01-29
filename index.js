@@ -157,6 +157,10 @@ class Bot {
           description = description.replace(/<a\s*[^>]*><\/a>/g, '');
           description = description.trim();
 
+          if (!description) {
+            description = 'Выберите действие:';
+          }
+
           const msg2 = await this.tgBot.sendMessage(
             this.chatId,
             `${description}`,
@@ -248,6 +252,16 @@ class Bot {
               this.commandsHandler.sendSuccessfullyUpdatedSubscribedChannels();
             } else {
               this.commandsHandler.sendErrorUpdatedSubscribedChannels(status.error);
+            }
+            break;
+
+          case botConstants.messages.updateSign:
+            const sign = text.split('\n');
+            status = await this.handleSaveSign(sign);
+            if (status.ok) {
+              this.commandsHandler.sendSuccessfullyUpdatedSign();
+            } else {
+              this.commandsHandler.sendErrorUpdatedSign(status.error);
             }
             break;
 
@@ -348,6 +362,11 @@ class Bot {
         case botConstants.commands.updateAbsoluteChannels:
           if (this.state.page !== 'startPage') return;
           this.commandsHandler.sendUpdateAbsoluteChannels();
+          break;
+
+        case botConstants.commands.updateSign:
+          if (this.state.page !== 'startPage') return;
+          this.commandsHandler.sendUpdateSign();
           break;
 
         case botConstants.commands.updateMyChannels:
@@ -882,6 +901,8 @@ class Bot {
       const posts = currentConnection.posts;
       const post = posts.find((post) => post.link == this.currentEditingPostLink);
 
+      const sign = await this.getSign();
+
       try {
         if (post.media.length) {
           const mediaGroup = [];
@@ -897,7 +918,6 @@ class Bot {
             mediaGroup.push(mediaObj);
           });
 
-          await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
           let description = post.description;
           description = description.replace(/<blockquote\b[^>]*>[\s\S]*?<\/blockquote>/gi, '');
           description = description.replaceAll('<br/>', '');
@@ -907,13 +927,17 @@ class Bot {
           description = description.replace(/<a\s*[^>]*><\/a>/g, '');
           description = description.trim();
 
-          if (!description) {
-            description = 'Выберите действие:';
+          if (description && description?.length < 1024) {
+            mediaGroup[0].caption = description;
+            await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
+          } else if (description) {
+            const desc = sign.length == 0 ? `${description}\n\n@${this.currentPublishChannel}` : `${description}\n\n<a href="${sign[0]}">${sign[1]}</a>`
+            await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, desc, {
+              parse_mode: 'HTML',
+            });
+          } else if (!description) {
+            await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
           }
-
-          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, `${description}\n\n@${this.currentPublishChannel}`, {
-            parse_mode: 'HTML',
-          });
         } else {
           let description = post.description;
           description = description.replace(/<blockquote\b[^>]*>[\s\S]*?<\/blockquote>/gi, '');
@@ -924,7 +948,9 @@ class Bot {
           description = description.replace(/<a\s*[^>]*><\/a>/g, '');
           description = description.trim();
 
-          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, `${description}\n\n@${this.currentPublishChannel}`, {
+          const desc = sign.length == 0 ? `${description}\n\n@${this.currentPublishChannel}` : `${description}\n\n<a href="${sign[0]}">${sign[1]}</a>`
+
+          await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, desc, {
             parse_mode: 'HTML',
           });
         }
@@ -1077,6 +1103,14 @@ class Bot {
       .findOne({ chatId: this.chatId });
     const channels = currentConnection.absoluteChannels || [];
     return channels;
+  }
+
+  async getSign() {
+    const currentConnection = await this.db
+      .collection('connections')
+      .findOne({ chatId: this.chatId });
+    const sign = currentConnection.sign || [];
+    return sign;
   }
 
   sendPostWithoutButtons(link, markup) {
@@ -1246,6 +1280,19 @@ class Bot {
     });
   }
 
+  handleSaveSign(sign) {
+    return new Promise(async (resolve) => {
+      try {
+        await this.db
+          .collection('connections')
+          .findOneAndUpdate({ chatId: this.chatId }, { $set: { sign: sign } });
+        resolve({ ok: true });
+      } catch (error) {
+        resolve({ ok: false, error: error });
+      }
+    });
+  }
+
   handleSaveMyChannels(channels) {
     return new Promise(async (resolve) => {
       try {
@@ -1347,6 +1394,13 @@ class CommandsHandler {
     });
   }
 
+  async sendUpdateSign() {
+    await this.tgBot.sendMessage(this.chatId, botConstants.messages.updateSign, {
+      parse_mode: 'HTML',
+      reply_markup: JSON.stringify({ force_reply: true }),
+    });
+  }
+
   async sendEditTextMessage() {
     const msg = await this.tgBot.sendMessage(this.chatId, botConstants.messages.editText, {
       parse_mode: 'HTML',
@@ -1363,10 +1417,26 @@ class CommandsHandler {
     );
   }
 
+  async sendSuccessfullyUpdatedSign() {
+    await this.tgBot.sendMessage(
+      this.chatId,
+      botConstants.messages.successfullyUpdateSign,
+      { parse_mode: 'HTML', reply_markup: botConstants.markups.startMarkup },
+    );
+  }
+
   async sendErrorUpdatedSubscribedChannels(error) {
     await this.tgBot.sendMessage(
       this.chatId,
       botConstants.messages.errorUpdateSubscribedChannels + ' ' + error,
+      { parse_mode: 'HTML', reply_markup: botConstants.markups.startMarkup },
+    );
+  }
+
+  async sendErrorUpdatedSign(error) {
+    await this.tgBot.sendMessage(
+      this.chatId,
+      botConstants.messages.errorUpdateSign + ' ' + error,
       { parse_mode: 'HTML', reply_markup: botConstants.markups.startMarkup },
     );
   }
