@@ -953,6 +953,9 @@ class Bot {
 
           await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, desc, {
             parse_mode: 'HTML',
+            link_preview_options: {
+              is_disabled: true
+            }
           });
         }
 
