@@ -928,7 +928,8 @@ class Bot {
           description = description.trim();
 
           if (description && description?.length < 1024) {
-            mediaGroup[0].caption = description;
+            const desc = sign.length == 0 ? `${description}\n\n@${this.currentPublishChannel}` : `${description}\n\n<a href="${sign[0]}">${sign[1]}</a>`
+            mediaGroup[0].caption = desc;
             mediaGroup[0].parse_mode = 'HTML'
             await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
           } else if (description) {
