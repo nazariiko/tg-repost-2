@@ -106,6 +106,8 @@ class Bot {
         if (!result.ok) {
           await this.commandsHandler.sendErrorPublishPost(result.error);
           await this.setPostIsSended(post);
+        } else {
+          await this.setPostIsSended(post);
         }
         this.currentEditingPostLink = null;
         this.currentEditingPostLink = null;
