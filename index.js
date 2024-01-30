@@ -102,10 +102,13 @@ class Bot {
       if (myChanels.length === 1 && absoluteChannels.includes(post.channelNickname)) {
         this.currentEditingPostLink = post.link;
         this.currentPublishChannel = myChanels[0];
-        await this.publishPostInMyChannel()
+        const result = await this.publishPostInMyChannel();
+        if (!result.ok) {
+          await this.commandsHandler.sendErrorPublishPost(result.error);
+          await this.setPostIsSended(post);
+        }
         this.currentEditingPostLink = null;
         this.currentEditingPostLink = null;
-        await this.setPostIsSended(post);
         continue;
       }
 
@@ -932,10 +935,14 @@ class Bot {
             mediaGroup[0].caption = desc;
             mediaGroup[0].parse_mode = 'HTML'
             await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
-          } else if (description) {
+          } else if (description && description?.length >= 1024) {
+            await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
             const desc = sign.length == 0 ? `${description}\n\n@${this.currentPublishChannel}` : `${description}\n\n<a href="${sign[0]}">${sign[1]}</a>`
             await this.tgBot.sendMessage(`@${this.currentPublishChannel}`, desc, {
               parse_mode: 'HTML',
+              link_preview_options: {
+                is_disabled: true
+              }
             });
           } else if (!description) {
             await this.tgBot.sendMediaGroup(`@${this.currentPublishChannel}`, mediaGroup);
